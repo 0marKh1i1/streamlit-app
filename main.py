@@ -1237,134 +1237,6 @@ if uploaded_file:
                 else:
                     st.warning(f"# {verdict}")
                 st.caption(f"Confidence: {confidence}%")
-
-        with tab_translation:
-            st.subheader(f"Translate to {target_lang}")
-            
-            # Get original file type
-            file_type = uploaded_file.name.split('.')[-1].lower()
-            
-            # Translation mode selection
-            translation_mode = st.radio(
-                "Translation Mode",
-                ["Preserve Original Formatting (Recommended)", "Create New Document", "Plain Text Only"],
-                horizontal=True,
-                help="'Preserve Formatting' keeps the original document structure and styling"
-            )
-            
-            if st.button("🌐 Translate Document", type="primary"):
-                original_name = uploaded_file.name.rsplit('.', 1)[0]
-                
-                if translation_mode == "Preserve Original Formatting (Recommended)":
-                    # Translate in-place preserving formatting
-                    if file_type == 'docx' and DOCX_SUPPORT:
-                        with st.spinner(f'Translating DOCX to {target_lang} (preserving formatting)...'):
-                            uploaded_file.seek(0)  # Reset file pointer
-                            doc_buffer, error = translate_docx_inplace(uploaded_file, target_lang)
-                        
-                        if error:
-                            st.error(error)
-                        else:
-                            st.success(f"✅ Document translated with original formatting preserved!")
-                            st.download_button(
-                                label="📥 Download Translated DOCX (Original Format)",
-                                data=doc_buffer,
-                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                    
-                    elif file_type in ['pptx', 'ppt']:
-                        with st.spinner(f'Translating PPTX to {target_lang} (preserving formatting)...'):
-                            uploaded_file.seek(0)  # Reset file pointer
-                            pptx_buffer, error = translate_pptx_inplace(uploaded_file, target_lang)
-                        
-                        if error:
-                            st.error(error)
-                        else:
-                            st.success(f"✅ Presentation translated with original formatting preserved!")
-                            st.download_button(
-                                label="📥 Download Translated PPTX (Original Format)",
-                                data=pptx_buffer,
-                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.pptx",
-                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                            )
-                    
-                    elif file_type == 'pdf':
-                        st.warning("⚠️ PDF in-place translation not supported. Using 'Create New Document' mode instead.")
-                        # Fall back to creating new document
-                        with st.spinner(f'Translating to {target_lang}...'):
-                            translated_text = translate_text(extracted_text, target_lang)
-                        
-                        if DOCX_SUPPORT:
-                            doc_buffer = create_translated_docx(translated_text, target_lang, uploaded_file.name)
-                            st.download_button(
-                                label="📥 Download as Translated DOCX",
-                                data=doc_buffer,
-                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                        else:
-                            st.download_button(
-                                label="📥 Download as Text",
-                                data=translated_text,
-                                file_name=f"{original_name}_{target_lang.lower()}.txt",
-                                mime="text/plain"
-                            )
-                    else:
-                        st.error(f"Unsupported file type for in-place translation: {file_type}")
-                
-                elif translation_mode == "Create New Document":
-                    with st.spinner(f'Translating to {target_lang}...'):
-                        translated_text = translate_text(extracted_text, target_lang)
-                    
-                    st.text_area(
-                        f"Translation Preview ({target_lang}):", 
-                        translated_text[:2000] + ("..." if len(translated_text) > 2000 else ""), 
-                        height=150
-                    )
-                    
-                    # Offer both DOCX and PPTX options
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if DOCX_SUPPORT:
-                            doc_buffer = create_translated_docx(translated_text, target_lang, uploaded_file.name)
-                            st.download_button(
-                                label="📥 Download as DOCX",
-                                data=doc_buffer,
-                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
-                    with col2:
-                        pptx_buffer = create_translated_pptx(translated_text, target_lang, uploaded_file.name)
-                        st.download_button(
-                            label="📥 Download as PPTX",
-                            data=pptx_buffer,
-                            file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.pptx",
-                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                        )
-                    
-                    st.success(f"✅ Translation complete! {len(translated_text.split())} words translated.")
-                
-                else:  # Plain Text Only
-                    with st.spinner(f'Translating to {target_lang}...'):
-                        translated_text = translate_text(extracted_text, target_lang)
-                    
-                    st.text_area(
-                        f"Translation ({target_lang}):", 
-                        translated_text, 
-                        height=300
-                    )
-                    
-                    st.download_button(
-                        label="📥 Download Translation (TXT)",
-                        data=translated_text,
-                        file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.txt",
-                        mime="text/plain"
-                    )
-                    st.success(f"✅ Translation complete! {len(translated_text.split())} words translated.")
-            else:
-                st.info("Click the button above to translate the document content.")
-
         with tab_risk:
             st.subheader("🛡️ Risk Management Dashboard")
             
@@ -1567,3 +1439,131 @@ if uploaded_file:
             </table>
             """
             st.markdown(risk_summary_html, unsafe_allow_html=True)
+        with tab_translation:
+            st.subheader(f"Translate to {target_lang}")
+            
+            # Get original file type
+            file_type = uploaded_file.name.split('.')[-1].lower()
+            
+            # Translation mode selection
+            translation_mode = st.radio(
+                "Translation Mode",
+                ["Preserve Original Formatting (Recommended)", "Create New Document", "Plain Text Only"],
+                horizontal=True,
+                help="'Preserve Formatting' keeps the original document structure and styling"
+            )
+            
+            if st.button("🌐 Translate Document", type="primary"):
+                original_name = uploaded_file.name.rsplit('.', 1)[0]
+                
+                if translation_mode == "Preserve Original Formatting (Recommended)":
+                    # Translate in-place preserving formatting
+                    if file_type == 'docx' and DOCX_SUPPORT:
+                        with st.spinner(f'Translating DOCX to {target_lang} (preserving formatting)...'):
+                            uploaded_file.seek(0)  # Reset file pointer
+                            doc_buffer, error = translate_docx_inplace(uploaded_file, target_lang)
+                        
+                        if error:
+                            st.error(error)
+                        else:
+                            st.success(f"✅ Document translated with original formatting preserved!")
+                            st.download_button(
+                                label="📥 Download Translated DOCX (Original Format)",
+                                data=doc_buffer,
+                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                    
+                    elif file_type in ['pptx', 'ppt']:
+                        with st.spinner(f'Translating PPTX to {target_lang} (preserving formatting)...'):
+                            uploaded_file.seek(0)  # Reset file pointer
+                            pptx_buffer, error = translate_pptx_inplace(uploaded_file, target_lang)
+                        
+                        if error:
+                            st.error(error)
+                        else:
+                            st.success(f"✅ Presentation translated with original formatting preserved!")
+                            st.download_button(
+                                label="📥 Download Translated PPTX (Original Format)",
+                                data=pptx_buffer,
+                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.pptx",
+                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                            )
+                    
+                    elif file_type == 'pdf':
+                        st.warning("⚠️ PDF in-place translation not supported. Using 'Create New Document' mode instead.")
+                        # Fall back to creating new document
+                        with st.spinner(f'Translating to {target_lang}...'):
+                            translated_text = translate_text(extracted_text, target_lang)
+                        
+                        if DOCX_SUPPORT:
+                            doc_buffer = create_translated_docx(translated_text, target_lang, uploaded_file.name)
+                            st.download_button(
+                                label="📥 Download as Translated DOCX",
+                                data=doc_buffer,
+                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                        else:
+                            st.download_button(
+                                label="📥 Download as Text",
+                                data=translated_text,
+                                file_name=f"{original_name}_{target_lang.lower()}.txt",
+                                mime="text/plain"
+                            )
+                    else:
+                        st.error(f"Unsupported file type for in-place translation: {file_type}")
+                
+                elif translation_mode == "Create New Document":
+                    with st.spinner(f'Translating to {target_lang}...'):
+                        translated_text = translate_text(extracted_text, target_lang)
+                    
+                    st.text_area(
+                        f"Translation Preview ({target_lang}):", 
+                        translated_text[:2000] + ("..." if len(translated_text) > 2000 else ""), 
+                        height=150
+                    )
+                    
+                    # Offer both DOCX and PPTX options
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if DOCX_SUPPORT:
+                            doc_buffer = create_translated_docx(translated_text, target_lang, uploaded_file.name)
+                            st.download_button(
+                                label="📥 Download as DOCX",
+                                data=doc_buffer,
+                                file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            )
+                    with col2:
+                        pptx_buffer = create_translated_pptx(translated_text, target_lang, uploaded_file.name)
+                        st.download_button(
+                            label="📥 Download as PPTX",
+                            data=pptx_buffer,
+                            file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.pptx",
+                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        )
+                    
+                    st.success(f"✅ Translation complete! {len(translated_text.split())} words translated.")
+                
+                else:  # Plain Text Only
+                    with st.spinner(f'Translating to {target_lang}...'):
+                        translated_text = translate_text(extracted_text, target_lang)
+                    
+                    st.text_area(
+                        f"Translation ({target_lang}):", 
+                        translated_text, 
+                        height=300
+                    )
+                    
+                    st.download_button(
+                        label="📥 Download Translation (TXT)",
+                        data=translated_text,
+                        file_name=f"{original_name}_{target_lang.lower().replace(' ', '_')}.txt",
+                        mime="text/plain"
+                    )
+                    st.success(f"✅ Translation complete! {len(translated_text.split())} words translated.")
+            else:
+                st.info("Click the button above to translate the document content.")
+
+        
