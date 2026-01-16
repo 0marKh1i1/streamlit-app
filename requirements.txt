@@ -1,0 +1,8 @@
+streamlit
+pandas
+plotly
+python-pptx
+pdfplumber
+python-docx
+deep-translator
+requests
