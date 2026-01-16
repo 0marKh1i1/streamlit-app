@@ -9,6 +9,8 @@ import io
 import re
 import unicodedata
 import requests
+import base64
+import os
 
 # Document extraction libraries
 try:
@@ -19,7 +21,6 @@ except ImportError:
 
 try:
     from docx import Document
-    from docx.shared import Pt as DocxPt, Inches as DocxInches
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     DOCX_SUPPORT = True
 except ImportError:
@@ -32,21 +33,36 @@ try:
 except ImportError:
     TRANSLATION_SUPPORT = False
 
+# Language codes mapping (used across translation functions)
+LANG_CODES = {
+    "Arabic": "ar", "English": "en", "French": "fr", "Spanish": "es",
+    "German": "de", "Italian": "it", "Portuguese": "pt", "Russian": "ru",
+    "Chinese (Simplified)": "zh-CN", "Chinese (Traditional)": "zh-TW",
+    "Japanese": "ja", "Korean": "ko", "Hindi": "hi", "Turkish": "tr",
+    "Dutch": "nl", "Polish": "pl", "Swedish": "sv", "Indonesian": "id",
+    "Thai": "th", "Vietnamese": "vi", "Hebrew": "he", "Persian": "fa",
+    "Urdu": "ur", "Bengali": "bn", "Greek": "el"
+}
+
+# RTL (Right-to-Left) languages
+RTL_LANGUAGES = {"Arabic", "Hebrew", "Persian", "Urdu"}
+
 # Free Cloud LLM Support (HuggingFace free tier - no API key needed)
 LLM_AVAILABLE = False
-LLM_TYPE = None
+
+# Mistral-7B-Instruct - Better for large texts and summaries (8K context)
+LLM_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 
 # Use HuggingFace Inference API (free tier, no key required)
 try:
     test_response = requests.post(
-        "https://api-inference.huggingface.co/models/google/flan-t5-large",
+        f"https://api-inference.huggingface.co/models/{LLM_MODEL}",
         json={"inputs": "test"},
         timeout=5
     )
     if test_response.status_code in [200, 503]:  # 503 means model loading
         LLM_AVAILABLE = True
-        LLM_TYPE = "huggingface"
-except:
+except Exception:
     pass
 
 # --- TEXT CLEANING FUNCTIONS ---
@@ -89,77 +105,36 @@ def clean_extracted_text(text):
 
 def extract_english_only(text):
     """Extract only English text from mixed content"""
-    # Split by the separator we added
     parts = re.split(r'\s*\|\s*', text)
     english_parts = []
     for part in parts:
-        # Check if part is primarily English/Latin
         if part.strip() and not re.search(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]', part):
             english_parts.append(part.strip())
     return ' '.join(english_parts)
 
-def extract_arabic_only(text):
-    """Extract only Arabic text from mixed content"""
-    # Split by the separator we added
-    parts = re.split(r'\s*\|\s*', text)
-    arabic_parts = []
-    for part in parts:
-        # Check if part contains Arabic
-        if part.strip() and re.search(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]', part):
-            arabic_parts.append(part.strip())
-    return ' '.join(arabic_parts)
-
-def format_bilingual_text(text):
-    """Format bilingual text with clear separation between languages"""
-    lines = text.split('\n')
-    formatted_lines = []
-    
-    for line in lines:
-        if ' | ' in line:
-            # Split by our separator
-            parts = line.split(' | ')
-            english_parts = []
-            arabic_parts = []
-            
-            for part in parts:
-                part = part.strip()
-                if not part:
-                    continue
-                if re.search(r'[\u0600-\u06FF]', part):
-                    arabic_parts.append(part)
-                else:
-                    english_parts.append(part)
-            
-            # Format: English first, then Arabic on new line with arrow
-            if english_parts:
-                formatted_lines.append(' '.join(english_parts))
-            if arabic_parts:
-                formatted_lines.append('  ← ' + ' '.join(arabic_parts))
-        else:
-            formatted_lines.append(line)
-    
-    return '\n'.join(formatted_lines)
-
-def separate_multilingual_text(text):
-    """Separate text into language blocks for better readability"""
-    if not text:
-        return text
-    
-    # Use format_bilingual_text for proper separation
-    return format_bilingual_text(text)
-
 # --- LLM HELPER FUNCTIONS ---
-def query_llm(prompt, max_tokens=500):
-    """Query HuggingFace free tier LLM (no API key needed)"""
+def query_llm(prompt, max_tokens=1024):
+    """Query HuggingFace free tier LLM (no API key needed) - Mistral-7B for better summaries"""
     if not LLM_AVAILABLE:
         return None
     
     try:
-        # Use free HuggingFace inference API with flan-t5-large
+        # Format prompt for Mistral instruction format
+        formatted_prompt = f"<s>[INST] {prompt} [/INST]"
+        
+        # Use free HuggingFace inference API with Mistral-7B-Instruct
         response = requests.post(
-            "https://api-inference.huggingface.co/models/google/flan-t5-large",
-            json={"inputs": prompt, "parameters": {"max_new_tokens": max_tokens}},
-            timeout=60
+            f"https://api-inference.huggingface.co/models/{LLM_MODEL}",
+            json={
+                "inputs": formatted_prompt, 
+                "parameters": {
+                    "max_new_tokens": max_tokens,
+                    "temperature": 0.3,
+                    "do_sample": True,
+                    "return_full_text": False
+                }
+            },
+            timeout=120
         )
         if response.status_code == 200:
             result = response.json()
@@ -171,18 +146,26 @@ def query_llm(prompt, max_tokens=500):
         elif response.status_code == 503:
             # Model is loading, wait and retry once
             import time
-            time.sleep(20)
+            time.sleep(30)
             response = requests.post(
-                "https://api-inference.huggingface.co/models/google/flan-t5-large",
-                json={"inputs": prompt, "parameters": {"max_new_tokens": max_tokens}},
-                timeout=60
+                f"https://api-inference.huggingface.co/models/{LLM_MODEL}",
+                json={
+                    "inputs": formatted_prompt, 
+                    "parameters": {
+                        "max_new_tokens": max_tokens,
+                        "temperature": 0.3,
+                        "do_sample": True,
+                        "return_full_text": False
+                    }
+                },
+                timeout=120
             )
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, list) and len(result) > 0:
                     return result[0].get('generated_text', '')
         return None
-    except Exception as e:
+    except Exception:
         return None
 
 # --- DOCUMENT EXTRACTION FUNCTIONS ---
@@ -237,35 +220,7 @@ def translate_text(text, target_lang):
     if not TRANSLATION_SUPPORT:
         return "Translation not available. Install: pip install deep-translator"
     
-    lang_codes = {
-        "Arabic": "ar",
-        "English": "en",
-        "French": "fr",
-        "Spanish": "es",
-        "German": "de",
-        "Italian": "it",
-        "Portuguese": "pt",
-        "Russian": "ru",
-        "Chinese (Simplified)": "zh-CN",
-        "Chinese (Traditional)": "zh-TW",
-        "Japanese": "ja",
-        "Korean": "ko",
-        "Hindi": "hi",
-        "Turkish": "tr",
-        "Dutch": "nl",
-        "Polish": "pl",
-        "Swedish": "sv",
-        "Indonesian": "id",
-        "Thai": "th",
-        "Vietnamese": "vi",
-        "Hebrew": "he",
-        "Persian": "fa",
-        "Urdu": "ur",
-        "Bengali": "bn",
-        "Greek": "el"
-    }
-    
-    target_code = lang_codes.get(target_lang, "en")
+    target_code = LANG_CODES.get(target_lang, "en")
     
     # Clean text before translation
     text = clean_extracted_text(text)
@@ -298,7 +253,7 @@ def translate_single_text(text, target_code):
             clean_text = clean_text[:4500]
         translated = GoogleTranslator(source='auto', target=target_code).translate(clean_text)
         return translated if translated else text
-    except:
+    except Exception:
         return text
 
 def translate_docx_inplace(file, target_lang):
@@ -306,16 +261,7 @@ def translate_docx_inplace(file, target_lang):
     if not DOCX_SUPPORT:
         return None, "DOCX support not installed"
     
-    lang_codes = {
-        "Arabic": "ar", "English": "en", "French": "fr", "Spanish": "es",
-        "German": "de", "Italian": "it", "Portuguese": "pt", "Russian": "ru",
-        "Chinese (Simplified)": "zh-CN", "Chinese (Traditional)": "zh-TW",
-        "Japanese": "ja", "Korean": "ko", "Hindi": "hi", "Turkish": "tr",
-        "Dutch": "nl", "Polish": "pl", "Swedish": "sv", "Indonesian": "id",
-        "Thai": "th", "Vietnamese": "vi", "Hebrew": "he", "Persian": "fa",
-        "Urdu": "ur", "Bengali": "bn", "Greek": "el"
-    }
-    target_code = lang_codes.get(target_lang, "en")
+    target_code = LANG_CODES.get(target_lang, "en")
     
     # Load the document
     doc = Document(file)
@@ -323,9 +269,6 @@ def translate_docx_inplace(file, target_lang):
     # Translate paragraphs while preserving formatting
     for para in doc.paragraphs:
         if para.text.strip():
-            # Store original formatting
-            original_alignment = para.paragraph_format.alignment
-            
             # Translate full paragraph text
             translated = translate_single_text(para.text, target_code)
             
@@ -352,7 +295,7 @@ def translate_docx_inplace(file, target_lang):
                 para.text = translated
             
             # Set RTL alignment for RTL languages
-            if target_lang in ["Arabic", "Hebrew", "Persian", "Urdu"]:
+            if target_lang in RTL_LANGUAGES:
                 para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
     # Translate tables
@@ -377,16 +320,7 @@ def translate_docx_inplace(file, target_lang):
 
 def translate_pptx_inplace(file, target_lang):
     """Translate a PPTX file preserving original structure and formatting"""
-    lang_codes = {
-        "Arabic": "ar", "English": "en", "French": "fr", "Spanish": "es",
-        "German": "de", "Italian": "it", "Portuguese": "pt", "Russian": "ru",
-        "Chinese (Simplified)": "zh-CN", "Chinese (Traditional)": "zh-TW",
-        "Japanese": "ja", "Korean": "ko", "Hindi": "hi", "Turkish": "tr",
-        "Dutch": "nl", "Polish": "pl", "Swedish": "sv", "Indonesian": "id",
-        "Thai": "th", "Vietnamese": "vi", "Hebrew": "he", "Persian": "fa",
-        "Urdu": "ur", "Bengali": "bn", "Greek": "el"
-    }
-    target_code = lang_codes.get(target_lang, "en")
+    target_code = LANG_CODES.get(target_lang, "en")
     
     # Load presentation
     prs = Presentation(file)
@@ -408,15 +342,12 @@ def translate_pptx_inplace(file, target_lang):
                             original_color = None
                             try:
                                 if run.font.color and run.font.color.type is not None:
-                                    # Only try to get RGB if it's an RGB color type
-                                    from pptx.enum.dml import MSO_THEME_COLOR
-                                    from pptx.dml.color import RGBColor
                                     try:
                                         original_color = run.font.color.rgb
                                     except AttributeError:
                                         # It's a scheme/theme color, skip RGB
                                         original_color = None
-                            except:
+                            except Exception:
                                 original_color = None
                             
                             # Translate
@@ -451,7 +382,7 @@ def create_translated_docx(translated_text, target_lang, original_filename):
     doc = Document()
     
     # Add title
-    title = doc.add_heading(f'Translated Document ({target_lang})', 0)
+    doc.add_heading(f'Translated Document ({target_lang})', 0)
     
     # Add metadata
     doc.add_paragraph(f"Original file: {original_filename}")
@@ -463,8 +394,8 @@ def create_translated_docx(translated_text, target_lang, original_filename):
     for para in paragraphs:
         if para.strip():
             p = doc.add_paragraph(para.strip())
-            # Set RTL for Arabic, Hebrew, Persian, Urdu
-            if target_lang in ["Arabic", "Hebrew", "Persian", "Urdu"]:
+            # Set RTL for RTL languages
+            if target_lang in RTL_LANGUAGES:
                 p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     
     # Save to bytes
@@ -516,7 +447,7 @@ def create_translated_pptx(translated_text, target_lang, original_filename):
 
 # --- ANALYSIS FUNCTIONS ---
 def generate_summary(text):
-    """Generate a readable summary from extracted text"""
+    """Generate a comprehensive, detailed summary with explanations from extracted text"""
     # Clean and prepare text - extract English for better summarization
     cleaned_text = clean_extracted_text(text)
     english_text = extract_english_only(cleaned_text)
@@ -529,16 +460,31 @@ def generate_summary(text):
     
     # Try LLM first for better summary
     if LLM_AVAILABLE and len(work_text) > 50:
-        prompt = f"""Summarize this document and make a nice formatted summary. Focus on main objectives and key findings:
+        prompt = f"""Analyze this document in detail and create a comprehensive executive summary with explanations.
 
-{work_text[:2500]}
+Structure your response as follows:
 
-Summary:"""
-        llm_summary = query_llm(prompt, max_tokens=300)
-        if llm_summary and len(llm_summary) > 30:
+1. **Overview**: Provide a 2-3 sentence overview of what this document is about.
+
+2. **Key Objectives**: List and explain the main objectives, goals, or purposes mentioned in the document. Provide context and reasoning for each.
+
+3. **Main Content**: Summarize the core content in detail. Include important details, initiatives, strategies, or processes mentioned.
+
+4. **Stakeholders & Resources**: Identify any mentioned teams, departments, stakeholders, or resources involved.
+
+5. **Important Details**: Highlight any critical information, requirements, constraints, or special considerations.
+
+6. **Implications**: Explain what this means for the organization or project and why it matters.
+
+Document Content:
+{work_text[:6000]}
+
+Comprehensive Summary:"""
+        llm_summary = query_llm(prompt, max_tokens=1024)
+        if llm_summary and len(llm_summary) > 50:
             return llm_summary.strip()
     
-    # Fallback to intelligent extraction
+    # Fallback to intelligent extraction (more comprehensive)
     # Look for key sections and extract meaningful content
     summary_parts = []
     
@@ -546,35 +492,78 @@ Summary:"""
     sentences = re.split(r'[.!?؟。\n]+', work_text)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 15]
     
-    # Prioritize sentences with key terms
+    # Prioritize sentences with key terms (expanded)
     priority_terms = ['objective', 'goal', 'strategy', 'initiative', 'platform', 
-                      'department', 'ai', 'digital', 'transformation', 'key', 'main']
+                      'department', 'ai', 'digital', 'transformation', 'key', 'main',
+                      'purpose', 'vision', 'mission', 'target', 'deliver', 'implement',
+                      'develop', 'create', 'establish', 'enhance', 'improve', 'focus']
+    
+    context_terms = ['background', 'overview', 'introduction', 'summary', 'scope',
+                     'stakeholder', 'team', 'resource', 'requirement', 'constraint']
+    
+    detail_terms = ['include', 'feature', 'component', 'process', 'phase', 'stage',
+                    'milestone', 'deliverable', 'output', 'result', 'outcome']
     
     priority_sentences = []
+    context_sentences = []
+    detail_sentences = []
     other_sentences = []
     
     for s in sentences:
-        if any(term in s.lower() for term in priority_terms):
+        s_lower = s.lower()
+        if any(term in s_lower for term in priority_terms):
             priority_sentences.append(s)
+        elif any(term in s_lower for term in context_terms):
+            context_sentences.append(s)
+        elif any(term in s_lower for term in detail_terms):
+            detail_sentences.append(s)
         else:
             other_sentences.append(s)
     
-    # Take priority sentences first, then fill with others
-    selected = priority_sentences[:4] + other_sentences[:2]
-    selected = selected[:5]  # Max 5 sentences
+    # Build comprehensive summary with structure
+    summary = "**📋 Document Overview:**\n"
     
-    if selected:
-        # Format as bullet points for readability
-        summary = "**Key Points:**\n"
-        for i, sent in enumerate(selected, 1):
-            # Clean up the sentence
+    # Add overview sentences
+    overview = context_sentences[:2] if context_sentences else other_sentences[:2]
+    for sent in overview:
+        sent = sent.strip()
+        if not sent.endswith(('.', '!', '?')):
+            sent += '.'
+        summary += f"{sent}\n\n"
+    
+    # Add key objectives
+    if priority_sentences:
+        summary += "**🎯 Key Objectives & Focus Areas:**\n"
+        for i, sent in enumerate(priority_sentences[:5], 1):
+            sent = sent.strip()
+            if not sent.endswith(('.', '!', '?')):
+                sent += '.'
+            summary += f"{i}. {sent}\n"
+        summary += "\n"
+    
+    # Add important details
+    if detail_sentences:
+        summary += "**📌 Important Details:**\n"
+        for sent in detail_sentences[:4]:
             sent = sent.strip()
             if not sent.endswith(('.', '!', '?')):
                 sent += '.'
             summary += f"• {sent}\n"
+        summary += "\n"
+    
+    # Add additional context
+    if len(other_sentences) > 2:
+        summary += "**ℹ️ Additional Context:**\n"
+        for sent in other_sentences[2:5]:
+            sent = sent.strip()
+            if not sent.endswith(('.', '!', '?')):
+                sent += '.'
+            summary += f"• {sent}\n"
+    
+    if len(summary) > 50:
         return summary
     
-    return "No summary could be generated from the document content."
+    return "No comprehensive summary could be generated from the document content."
 
 def extract_dates(text):
     """Extract dates mentioned in the document"""
@@ -1025,104 +1014,83 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. CUSTOM CSS (The "Green Design" Magic) ---
-def local_css():
-    st.markdown("""
-    <style>
-        /* Headings */
-        h1, h2, h3 {
-            color: #2E7D32; /* Match primary green */
-            font-family: 'Arial', sans-serif;
-        }
+# --- 2. LOAD CSS AND PATTERN BORDERS ---
+def load_css():
+    with open("style.css") as f:
+        css_content = f.read()
+    
+    st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+
+def load_pattern_borders():
+    """Inject pattern border elements as HTML divs"""
+    pattern_path = "pattern.png"
+    if os.path.exists(pattern_path):
+        with open(pattern_path, "rb") as img_file:
+            pattern_base64 = base64.b64encode(img_file.read()).decode()
         
-        /* Metric Cards - similar to the PPT 'Department' boxes */
-        div[data-testid="stMetric"] {
-            background-color: #515859;
-            border: 1px solid #C5E1A5;
-            padding: 15px;
-            border-radius: 5px;
-            color: #2E7D32;
-        }
+        pattern_html = f'''
+        <div class="pattern-border pattern-border-left" 
+             style="background-image: url('data:image/png;base64,{pattern_base64}');"></div>
+        <div class="pattern-border pattern-border-right" 
+             style="background-image: url('data:image/png;base64,{pattern_base64}');"></div>
+        <div class="pattern-border-horizontal pattern-border-top" 
+             style="background-image: url('data:image/png;base64,{pattern_base64}');"></div>
+        <div class="pattern-border-horizontal pattern-border-bottom" 
+             style="background-image: url('data:image/png;base64,{pattern_base64}');"></div>
+        '''
+        st.markdown(pattern_html, unsafe_allow_html=True)
 
-        /* Custom Button Styling to match 'DC' Logo style */
-        div.stButton > button {
-            background-color: #2E7D32;
-            color: white;
-            font-weight: bold;
-            border-radius: 5px;
-            border: none;
-            padding: 10px 20px;
-        }
-        div.stButton > button:hover {
-            background-color: #1B5E20; /* Darker green on hover */
-            color: white;
-        }
+load_css()
+load_pattern_borders()
 
-        /* File Uploader Box Styling */
-        div[data-testid="stFileUploader"] {
-            border: 2px dashed #2E7D32;
-            border-radius: 10px;
-            padding: 20px;
-        }
-        
-        /* Success/Error Message styling */
-        .stSuccess {
-            background-color: #E8F5E9;
-            color: #2E7D32;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+# --- 3. MAIN INTERFACE ---
 
-local_css()
-
-# --- 3. SIDEBAR (Navigation & Inputs) ---
-with st.sidebar:
-    st.image("https://placehold.co/200x80/2E7D32/FFFFFF?text=DC+Solutions", width='stretch') # Placeholder for DC Logo
-    st.header("Transformation Settings")
-    
-    # Expanded language list
-    languages = [
-        "Arabic", "English", "French", "Spanish", "German", "Italian", 
-        "Portuguese", "Russian", "Chinese (Simplified)", "Chinese (Traditional)",
-        "Japanese", "Korean", "Hindi", "Turkish", "Dutch", "Polish",
-        "Swedish", "Indonesian", "Thai", "Vietnamese", "Hebrew", 
-        "Persian", "Urdu", "Bengali", "Greek"
-    ]
-    target_lang = st.selectbox("Target Language", languages)
-    
-    st.markdown("---")
-    st.caption("System Status")
-    
-    # Show LLM status
-    if LLM_AVAILABLE:
-        st.success("● AI Engine: HuggingFace (Free)")
-    else:
-        st.warning("● AI Engine: Rule-based")
-    
-    st.success("● ISO 42001 Governance: Active")
-    
-    # Show supported features
-    st.markdown("---")
-    st.caption("Supported Features")
-    st.write(f"📄 PDF: {'✅' if PDF_SUPPORT else '❌'}")
-    st.write(f"📝 DOCX: {'✅' if DOCX_SUPPORT else '❌'}")
-    st.write(f"🌐 Translation: {'✅' if TRANSLATION_SUPPORT else '❌'}")
-    st.write(f"🔄 In-place Translation: {'✅ DOCX/PPTX' if DOCX_SUPPORT else '❌'}")
-
-# --- 4. MAIN INTERFACE ---
-
-# Header Section
-col1, col2 = st.columns([1, 5])
+# Header Section with logos (always visible)
+col1, col2 = st.columns([5, 1])
 with col1:
-    # Use a generic green logo or upload the 'DC' logo image provided in the PPT
-    st.markdown("## 🟩 **DC**") 
+    st.image("https://placehold.co/250x80/000000/FFFFFF?text=Intelligent+Solution", width=250)
+    st.markdown("**Digital Transformation Enabler** | Fast-Track Solution Rebuild")
 with col2:
-    st.title("Digital Transformation Enabler")
-    st.markdown("**Fast-Track Solution Rebuild** | Phase 2 Execution")
+    # DC Logo placeholder on the right
+    st.image("icon.png", width=100)
+
+# Initialize session state for user ID
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = None
+
+# User ID Entry Screen
+if st.session_state.user_id is None:
+    st.markdown("---")
+    
+    # Center the ID input using columns
+    col_left, col_center, col_right = st.columns([1, 1, 1])
+    with col_center:
+        st.markdown("### Please enter your ID")
+        with st.form("user_id_form", clear_on_submit=False):
+            st.markdown('<div class="id-input-container">', unsafe_allow_html=True)
+            user_id_input = st.text_input("Enter your ID", placeholder="Enter any ID...", label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
+            submitted = st.form_submit_button("Continue", type="primary", use_container_width=True)
+            if submitted:
+                if user_id_input.strip():
+                    st.session_state.user_id = user_id_input.strip()
+                    st.rerun()
+                else:
+                    st.error("Please enter a valid ID")
+    
+    st.stop()  # Stop execution here until ID is entered
+
+# Language options - derive from LANG_CODES constant
+languages = list(LANG_CODES.keys())
 
 # Main Content Area
 st.markdown("### 1. Document Ingestion")
-uploaded_file = st.file_uploader("Upload Project Mandate (PDF/DOCX/PPTX)", type=['pdf', 'docx', 'pptx', 'ppt'])
+
+col_left, col_upload, col_right = st.columns([1, 2, 1])
+with col_upload:
+    uploaded_file = st.file_uploader("Upload Document", type=['pdf', 'docx', 'pptx', 'ppt'], label_visibility="collapsed")
+    st.markdown("**Target language**")
+    target_lang = st.selectbox("Target Language", languages, label_visibility="collapsed")
 
 if uploaded_file:
     # REAL DOCUMENT PROCESSING
@@ -1137,18 +1105,6 @@ if uploaded_file:
         # Text is already cleaned by extract functions, but ensure it's clean
         extracted_text = clean_extracted_text(extracted_text)
         
-        st.success(f"✅ Successfully extracted {len(extracted_text.split())} words from {uploaded_file.name}")
-        
-        # Show extracted text preview with option to view separated by language
-        with st.expander("📄 View Extracted Text", expanded=False):
-            view_option = st.radio("View Mode", ["Cleaned Text", "Language Separated"], horizontal=True)
-            
-            if view_option == "Language Separated":
-                display_text = separate_multilingual_text(extracted_text)
-            else:
-                display_text = extracted_text
-            
-            st.text_area("Extracted Content", display_text[:5000] + ("..." if len(display_text) > 5000 else ""), height=200)
         
         st.markdown("---")
         
@@ -1164,41 +1120,59 @@ if uploaded_file:
         # --- DASHBOARD LAYOUT ---
         st.markdown("### 2. Strategic Analysis")
         
-        # Row 1: High Level Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Risk Score", f"{risk_level} ({risk_score})", "Analyzed")
-        m2.metric("Word Count", f"{len(extracted_text.split()):,}", "Extracted")
-        m3.metric("Est. Duration", duration, "Calculated")
-        m4.metric("Compliance", "ISO 42001", "Framework")
-
-        # Row 2: Deep Dive (Split into Tabs)
-        tab_summary, tab_timeline, tab_decision, tab_translation = st.tabs([
+        # Main Navigation Tabs (replacing metric boxes)
+        tab_summary, tab_timeline, tab_decision, tab_translation, tab_risk = st.tabs([
             "📄 Executive Summary", 
             "📅 Project Timeline", 
             "⚖️ Go/No-Go Analysis",
-            "🌐 Translation"
+            "🌐 Translation",
+            "🛡️ Risk Management"
         ])
 
         with tab_summary:
             st.subheader("Auto-Generated Summary")
             summary = generate_summary(extracted_text)
-            # Use markdown for better formatting of bullet points
-            st.markdown(summary)
+            # Use markdown with class-based styling
+            st.markdown(f"<div class='summary-box'>{summary}</div>", unsafe_allow_html=True)
             
             col_a, col_b = st.columns(2)
             with col_a:
                 st.subheader("📌 Key Topics Detected")
                 if keywords:
+                    # Create styled HTML table for key topics
+                    table_html = """
+                    <table class="styled-table">
+                        <thead>
+                            <tr>
+                                <th>Key Topic</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
                     for kw in keywords:
-                        st.markdown(f"• {kw}")
+                        table_html += f"<tr><td>{kw}</td></tr>"
+                    table_html += "</tbody></table>"
+                    st.markdown(table_html, unsafe_allow_html=True)
                 else:
                     st.write("No specific project keywords detected.")
             
             with col_b:
                 st.subheader("📅 Dates Mentioned")
                 if dates_found:
+                    # Create styled HTML table for dates
+                    table_html = """
+                    <table class="styled-table-dates">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
                     for d in dates_found[:10]:
-                        st.markdown(f"• {d}")
+                        table_html += f"<tr><td>{d}</td></tr>"
+                    table_html += "</tbody></table>"
+                    st.markdown(table_html, unsafe_allow_html=True)
                 else:
                     st.write("No specific dates found in document.")
 
@@ -1212,14 +1186,37 @@ if uploaded_file:
                 x_end="Finish", 
                 y="Task", 
                 color="Resource", 
-                color_discrete_sequence=["#2E7D32", "#66BB6A", "#A5D6A7", "#81C784"]
+                color_discrete_sequence=["#4a5568", "#718096", "#a0aec0", "#cbd5e0"]
             )
             fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=400)
+            fig.update_layout(
+                height=400,
+                paper_bgcolor='#f8f9fa',
+                plot_bgcolor='#ffffff',
+                font=dict(size=14),
+                margin=dict(l=10, r=10, t=10, b=10)
+            )
             st.plotly_chart(fig, use_container_width=True)
             
             st.subheader("Timeline Details")
-            st.dataframe(timeline_df, use_container_width=True)
+            # Style the timeline details table
+            timeline_html = """
+            <table class="timeline-table">
+                <thead>
+                    <tr>
+            """
+            for col in timeline_df.columns:
+                timeline_html += f"<th>{col}</th>"
+            timeline_html += "</tr></thead><tbody>"
+            
+            for _, row in timeline_df.iterrows():
+                timeline_html += "<tr>"
+                for col in timeline_df.columns:
+                    timeline_html += f"<td>{row[col]}</td>"
+                timeline_html += "</tr>"
+            
+            timeline_html += "</tbody></table>"
+            st.markdown(timeline_html, unsafe_allow_html=True)
 
         with tab_decision:
             c1, c2 = st.columns([2, 1])
@@ -1367,3 +1364,206 @@ if uploaded_file:
                     st.success(f"✅ Translation complete! {len(translated_text.split())} words translated.")
             else:
                 st.info("Click the button above to translate the document content.")
+
+        with tab_risk:
+            st.subheader("🛡️ Risk Management Dashboard")
+            
+            # Risk Overview Section
+            col_risk1, col_risk2, col_risk3 = st.columns(3)
+            
+            with col_risk1:
+                # Risk Score Gauge
+                risk_color = "#43A047" if risk_level == "Low" else "#FFA726" if risk_level == "Medium" else "#EF5350"
+                st.metric(
+                    label="Overall Risk Score",
+                    value=f"{risk_score}/10",
+                    delta=f"{risk_level} Risk"
+                )
+            
+            with col_risk2:
+                st.metric(
+                    label="Project Duration",
+                    value=duration,
+                    delta="Estimated"
+                )
+            
+            with col_risk3:
+                st.metric(
+                    label="Confidence Level",
+                    value=f"{confidence}%",
+                    delta="Analysis Confidence"
+                )
+            
+            st.markdown("---")
+            
+            # Risk Categories Analysis
+            st.subheader("📊 Risk Categories Breakdown")
+            
+            # Extract risk-related keywords for categorization
+            text_lower = extracted_text.lower()
+            
+            risk_categories = {
+                "Technical Risk": {
+                    "indicators": ["technical", "system", "software", "hardware", "integration", "compatibility", "bug", "error", "failure"],
+                    "score": 0
+                },
+                "Financial Risk": {
+                    "indicators": ["budget", "cost", "expense", "funding", "investment", "financial", "money", "price", "revenue"],
+                    "score": 0
+                },
+                "Schedule Risk": {
+                    "indicators": ["deadline", "delay", "timeline", "schedule", "milestone", "late", "overdue", "time"],
+                    "score": 0
+                },
+                "Resource Risk": {
+                    "indicators": ["resource", "staff", "team", "personnel", "capacity", "availability", "shortage", "skill"],
+                    "score": 0
+                },
+                "Compliance Risk": {
+                    "indicators": ["compliance", "regulatory", "legal", "policy", "standard", "requirement", "audit", "governance"],
+                    "score": 0
+                },
+                "Operational Risk": {
+                    "indicators": ["operational", "process", "workflow", "efficiency", "performance", "quality", "maintenance"],
+                    "score": 0
+                }
+            }
+            
+            # Calculate scores for each category
+            for category, data in risk_categories.items():
+                count = sum(1 for word in data["indicators"] if word in text_lower)
+                data["score"] = min(10, count * 2)  # Scale to 0-10
+            
+            # Display risk categories
+            col_cat1, col_cat2 = st.columns(2)
+            
+            categories_list = list(risk_categories.items())
+            
+            with col_cat1:
+                for category, data in categories_list[:3]:
+                    score = data["score"]
+                    level = "🟢 Low" if score <= 3 else "🟡 Medium" if score <= 6 else "🔴 High"
+                    st.write(f"**{category}:** {level}")
+                    st.progress(score / 10)
+            
+            with col_cat2:
+                for category, data in categories_list[3:]:
+                    score = data["score"]
+                    level = "🟢 Low" if score <= 3 else "🟡 Medium" if score <= 6 else "🔴 High"
+                    st.write(f"**{category}:** {level}")
+                    st.progress(score / 10)
+            
+            st.markdown("---")
+            
+            # Risk Indicators Found
+            st.subheader("⚠️ Risk Indicators Detected")
+            
+            high_risk_words = ['urgent', 'critical', 'risk', 'delay', 'issue', 'problem', 'challenge', 'concern', 'failure', 'crisis', 'threat', 'danger', 'warning']
+            medium_risk_words = ['consider', 'review', 'assess', 'evaluate', 'potential', 'uncertain', 'unclear', 'possible', 'might', 'could']
+            positive_words = ['complete', 'success', 'achieved', 'approved', 'confirmed', 'stable', 'secure', 'resolved', 'mitigated', 'controlled']
+            
+            found_high = [word for word in high_risk_words if word in text_lower]
+            found_medium = [word for word in medium_risk_words if word in text_lower]
+            found_positive = [word for word in positive_words if word in text_lower]
+            
+            col_ind1, col_ind2, col_ind3 = st.columns(3)
+            
+            with col_ind1:
+                st.markdown("**🔴 High Risk Indicators**")
+                if found_high:
+                    for word in found_high[:5]:
+                        st.write(f"• {word.capitalize()}")
+                else:
+                    st.write("None detected ✓")
+            
+            with col_ind2:
+                st.markdown("**🟡 Medium Risk Indicators**")
+                if found_medium:
+                    for word in found_medium[:5]:
+                        st.write(f"• {word.capitalize()}")
+                else:
+                    st.write("None detected ✓")
+            
+            with col_ind3:
+                st.markdown("**🟢 Positive Indicators**")
+                if found_positive:
+                    for word in found_positive[:5]:
+                        st.write(f"• {word.capitalize()}")
+                else:
+                    st.write("None detected")
+            
+            st.markdown("---")
+            
+            # Risk Mitigation Recommendations
+            st.subheader("💡 Risk Mitigation Recommendations")
+            
+            recommendations = []
+            
+            if risk_score < 4:
+                recommendations.append("⚠️ **High Priority:** Conduct immediate risk assessment meeting with stakeholders")
+                recommendations.append("📋 Develop detailed contingency plans for identified risks")
+                recommendations.append("👥 Consider allocating additional resources to risk mitigation")
+            
+            if any(cat["score"] > 6 for cat in risk_categories.values()):
+                high_risk_cats = [cat for cat, data in risk_categories.items() if data["score"] > 6]
+                for cat in high_risk_cats:
+                    recommendations.append(f"🎯 Focus on reducing **{cat}** through targeted interventions")
+            
+            if "delay" in text_lower or "deadline" in text_lower:
+                recommendations.append("⏰ Implement schedule monitoring and early warning systems")
+            
+            if "budget" in text_lower or "cost" in text_lower:
+                recommendations.append("💰 Establish budget tracking and cost control measures")
+            
+            if len(recommendations) == 0:
+                recommendations.append("✅ Risk levels appear manageable - maintain regular monitoring")
+                recommendations.append("📊 Continue periodic risk assessments throughout project lifecycle")
+                recommendations.append("📝 Document lessons learned for future risk management")
+            
+            for rec in recommendations:
+                st.markdown(rec)
+            
+            st.markdown("---")
+            
+            # Risk Summary Table
+            st.subheader("📋 Risk Summary Report")
+            
+            risk_summary_html = f"""
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Overall Risk Score</td>
+                        <td>{risk_score}/10</td>
+                        <td>{'🟢' if risk_score >= 7 else '🟡' if risk_score >= 4 else '🔴'} {risk_level}</td>
+                    </tr>
+                    <tr>
+                        <td>High Risk Indicators</td>
+                        <td>{len(found_high)}</td>
+                        <td>{'🟢' if len(found_high) <= 1 else '🟡' if len(found_high) <= 3 else '🔴'}</td>
+                    </tr>
+                    <tr>
+                        <td>Positive Indicators</td>
+                        <td>{len(found_positive)}</td>
+                        <td>{'🟢' if len(found_positive) >= 3 else '🟡' if len(found_positive) >= 1 else '🔴'}</td>
+                    </tr>
+                    <tr>
+                        <td>Go/No-Go Decision</td>
+                        <td>{verdict}</td>
+                        <td>{confidence}% Confidence</td>
+                    </tr>
+                    <tr>
+                        <td>Estimated Duration</td>
+                        <td>{duration}</td>
+                        <td>📅</td>
+                    </tr>
+                </tbody>
+            </table>
+            """
+            st.markdown(risk_summary_html, unsafe_allow_html=True)

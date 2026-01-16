@@ -1,0 +1,650 @@
+/* Force Light Theme with Lighter Green Background */
+:root {
+    color-scheme: light only;
+    --primary-green: #43A047;
+    --dark-green: #2E7D32;
+    --light-bg: #E8F5E9;
+    --card-bg: #FFFFFF;
+    --accent-green: #81C784;
+    --text-dark: #1B5E20;
+    --text-body: #37474F;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --pattern-width: 80px;
+}
+
+/* ===== Pattern Frame Border (HTML Elements) ===== */
+.pattern-border {
+    position: fixed;
+    top: 0;
+    width: var(--pattern-width);
+    height: 100%;
+    background-repeat: repeat-y;
+    background-size: var(--pattern-width) auto;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.pattern-border-left {
+    left: 0;
+    background-position: left top;
+}
+
+.pattern-border-right {
+    right: 0;
+    background-position: right top;
+    transform: scaleX(-1);
+}
+
+/* Add padding to main content to avoid overlap with pattern borders */
+[data-testid="stAppViewContainer"] > .main {
+    padding-left: calc(var(--pattern-width) + 20px) !important;
+    padding-right: calc(var(--pattern-width) + 20px) !important;
+}
+
+.block-container {
+    max-width: calc(100% - var(--pattern-width) * 2 - 40px) !important;
+    margin: 0 auto !important;
+}
+
+[data-testid="stAppViewContainer"],
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+.stApp,
+.main,
+section[data-testid="stSidebar"],
+.block-container {
+    background: linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%) !important;
+    color: var(--text-body) !important;
+}
+
+.stMain, [data-testid="stMain"] {
+    background: linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%) !important;
+}
+
+/* Text Colors */
+.stMarkdown, .stText, p, span, label, .stSelectbox label {
+    color: var(--text-body) !important;
+}
+
+/* Headings */
+h1 {
+    color: var(--dark-green) !important;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+}
+
+h2, h3 {
+    color: var(--primary-green) !important;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-weight: 600 !important;
+}
+
+/* Metric Cards */
+div[data-testid="stMetric"] {
+    background: var(--card-bg) !important;
+    border: none;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+div[data-testid="stMetric"]:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+}
+
+div[data-testid="stMetric"] label {
+    color: var(--text-dark) !important;
+    font-weight: 600 !important;
+}
+
+div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+    color: var(--primary-green) !important;
+    font-weight: 700 !important;
+}
+
+/* Buttons */
+div.stButton > button {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    color: white !important;
+    font-weight: 600;
+    border-radius: 10px;
+    border: none;
+    padding: 12px 28px;
+    box-shadow: 0 3px 10px rgba(46, 125, 50, 0.3);
+    transition: all 0.3s ease;
+    text-transform: none;
+    letter-spacing: 0.3px;
+}
+
+div.stButton > button *,
+div.stButton > button p,
+div.stButton > button span,
+div.stButton > button div {
+    color: white !important;
+}
+
+div.stButton > button:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #1B5E20 100%);
+    color: white !important;
+    box-shadow: 0 5px 15px rgba(46, 125, 50, 0.4);
+    transform: translateY(-2px);
+}
+
+div.stButton > button:hover *,
+div.stButton > button:hover p,
+div.stButton > button:hover span,
+div.stButton > button:hover div {
+    color: white !important;
+}
+
+div.stButton > button:active {
+    transform: translateY(0);
+}
+
+/* File Uploader */
+div[data-testid="stFileUploader"] {
+    border: 2px dashed var(--accent-green);
+    border-radius: 16px;
+    padding: 24px;
+    background: var(--card-bg) !important;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+}
+
+div[data-testid="stFileUploader"]:hover {
+    border-color: var(--primary-green);
+    box-shadow: var(--shadow-hover);
+}
+
+/* Custom uploader instructions (inside the box) */
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    position: relative;
+}
+
+/* Keep Streamlit's icon, hide only its text */
+[data-testid="stFileUploaderDropzoneInstructions"] span {
+    font-size: 0 !important;
+    color: transparent !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] span svg {
+    display: inline-block !important;
+    width: 48px;
+    height: 48px;
+    color: var(--accent-green) !important;
+    fill: currentColor;
+    transition: color 0.3s ease;
+}
+
+div[data-testid="stFileUploader"]:hover [data-testid="stFileUploaderDropzoneInstructions"] span svg {
+    color: var(--primary-green) !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"]::before {
+    content: "Drop a file here or click to browse";
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+}
+
+/* Hide file size and type limit text */
+div[data-testid="stFileUploader"] section > div:last-child {
+    display: none !important;
+}
+
+div[data-testid="stFileUploader"] small {
+    display: none !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] > div:last-child {
+    display: none !important;
+}
+
+/* Success Message */
+.stSuccess {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    color: var(--dark-green);
+    border-radius: 10px;
+    border-left: 4px solid var(--primary-green);
+}
+
+/* Input Fields */
+.stTextInput input, .stTextArea textarea {
+    background-color: var(--card-bg) !important;
+    color: var(--text-body) !important;
+    border: 2px solid #C8E6C9 !important;
+    border-radius: 10px !important;
+    padding: 12px 16px !important;
+    transition: all 0.3s ease !important;
+}
+
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: var(--primary-green) !important;
+    box-shadow: 0 0 0 3px rgba(67, 160, 71, 0.15) !important;
+}
+
+.stSelectbox > div > div {
+    background-color: var(--card-bg) !important;
+    color: var(--text-body) !important;
+    border: 2px solid #C8E6C9 !important;
+    border-radius: 10px !important;
+}
+
+.stSelectbox > div > div:hover {
+    border-color: var(--accent-green) !important;
+}
+
+/* Expander */
+.streamlit-expanderHeader {
+    background: var(--card-bg) !important;
+    color: var(--text-dark) !important;
+    border-radius: 10px !important;
+    border: 1px solid #C8E6C9 !important;
+    font-weight: 600 !important;
+}
+
+.streamlit-expanderContent {
+    background: var(--card-bg) !important;
+    border: 1px solid #C8E6C9 !important;
+    border-top: none !important;
+    border-radius: 0 0 10px 10px !important;
+}
+
+/* Tabs - Modern Big Rectangle Style */
+.stTabs [data-baseweb="tab-list"] {
+    background: transparent !important;
+    gap: 20px;
+    padding: 16px 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 16px !important;
+    border: none !important;
+    padding: 32px 56px !important;
+    font-weight: 700 !important;
+    font-size: 20px !important;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    min-height: 90px !important;
+    min-width: 260px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    text-transform: none !important;
+    letter-spacing: 0.5px !important;
+    color: var(--text-dark) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+.stTabs [data-baseweb="tab"] p,
+.stTabs [data-baseweb="tab"] span,
+.stTabs [data-baseweb="tab"] div {
+    color: var(--text-dark) !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background: rgba(241, 248, 233, 0.95) !important;
+    transform: translateY(-5px) scale(1.02) !important;
+    box-shadow: 0 12px 32px rgba(67, 160, 71, 0.2) !important;
+    color: var(--primary-green) !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover p,
+.stTabs [data-baseweb="tab"]:hover span,
+.stTabs [data-baseweb="tab"]:hover div {
+    color: var(--primary-green) !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%) !important;
+    color: white !important;
+    box-shadow: 0 12px 40px rgba(46, 125, 50, 0.35) !important;
+    transform: translateY(-5px) scale(1.05) !important;
+}
+
+.stTabs [aria-selected="true"] p,
+.stTabs [aria-selected="true"] span,
+.stTabs [aria-selected="true"] div {
+    color: white !important;
+}
+
+.stTabs [aria-selected="true"]:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #1B5E20 100%) !important;
+    color: white !important;
+}
+
+.stTabs [aria-selected="true"]:hover p,
+.stTabs [aria-selected="true"]:hover span,
+.stTabs [aria-selected="true"]:hover div {
+    color: white !important;
+}
+
+/* ID Input Styling */
+.id-input-container .stTextInput > div > div > input {
+    height: 56px !important;
+    font-size: 18px !important;
+    text-align: center !important;
+    border: 2px solid var(--accent-green) !important;
+    border-radius: 12px !important;
+    background: var(--card-bg) !important;
+    transition: all 0.3s ease !important;
+}
+
+.id-input-container .stTextInput > div > div > input:focus {
+    border-color: var(--primary-green) !important;
+    box-shadow: 0 0 0 4px rgba(67, 160, 71, 0.2) !important;
+}
+
+.id-input-container {
+    max-width: 320px !important;
+    margin: 0 auto !important;
+}
+
+/* Form Submit Button (Continue button) */
+[data-testid="stFormSubmitButton"] button,
+.stFormSubmitButton button,
+button[kind="primaryFormSubmit"] {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%) !important;
+    color: white !important;
+}
+
+[data-testid="stFormSubmitButton"] button *,
+[data-testid="stFormSubmitButton"] button p,
+[data-testid="stFormSubmitButton"] button span,
+[data-testid="stFormSubmitButton"] button div,
+.stFormSubmitButton button *,
+button[kind="primaryFormSubmit"] * {
+    color: white !important;
+}
+
+/* Download Buttons */
+.stDownloadButton > button {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    color: white !important;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-weight: 600;
+    box-shadow: 0 3px 10px rgba(46, 125, 50, 0.25);
+    transition: all 0.3s ease;
+}
+
+.stDownloadButton > button *,
+.stDownloadButton > button p,
+.stDownloadButton > button span,
+.stDownloadButton > button div {
+    color: white !important;
+}
+
+.stDownloadButton > button:hover {
+    box-shadow: 0 5px 15px rgba(46, 125, 50, 0.35);
+    transform: translateY(-2px);
+}
+
+.stDownloadButton > button:hover *,
+.stDownloadButton > button:hover p,
+.stDownloadButton > button:hover span,
+.stDownloadButton > button:hover div {
+    color: white !important;
+}
+
+/* Progress Bar */
+.stProgress > div > div {
+    background: linear-gradient(90deg, var(--accent-green) 0%, var(--primary-green) 100%) !important;
+    border-radius: 10px !important;
+}
+
+/* Dividers */
+hr {
+    border-color: #C8E6C9 !important;
+    margin: 24px 0 !important;
+}
+
+/* Data Tables */
+.stDataFrame {
+    border-radius: 12px !important;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+/* Alerts */
+.stAlert {
+    border-radius: 12px !important;
+    border: none !important;
+    box-shadow: var(--shadow);
+}
+
+/* Slider */
+.stSlider > div > div > div {
+    background: var(--accent-green) !important;
+}
+
+.stSlider > div > div > div > div {
+    background: var(--primary-green) !important;
+}
+
+/* Checkbox and Radio */
+.stCheckbox label, .stRadio label {
+    font-weight: 500 !important;
+}
+
+/* Spinner */
+.stSpinner > div {
+    border-top-color: var(--primary-green) !important;
+}
+
+/* ===== Custom Summary and Table Styles ===== */
+
+/* Summary Box Styling */
+.summary-box {
+    font-size: 18px; 
+    background-color: #f8f9fa; 
+    padding: 20px; 
+    border-radius: 8px; 
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+/* Key Topics Table */
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.styled-table th {
+    background-color: #4a5568;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.styled-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.styled-table tr:last-child td {
+    border-bottom: none;
+}
+
+.styled-table tr:hover {
+    background-color: #e2e8f0;
+}
+
+/* Dates Table */
+.styled-table-dates {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.styled-table-dates th {
+    background-color: #4a5568;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.styled-table-dates td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.styled-table-dates tr:last-child td {
+    border-bottom: none;
+}
+
+.styled-table-dates tr:hover {
+    background-color: #e2e8f0;
+}
+
+/* Timeline Table */
+.timeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-table th {
+    background-color: #4a5568;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.timeline-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.timeline-table tr:last-child td {
+    border-bottom: none;
+}
+
+.timeline-table tr:hover {
+    background-color: #e2e8f0;
+}
+
+/* Go/No-Go Progress Bars */
+div[data-testid="stProgress"] > div > div > div > div {
+    background-color: #4a5568 !important;
+}
+
+/* Translation Mode Radio Buttons */
+div[data-testid="stRadio"] > div {
+    gap: 15px !important;
+}
+
+div[data-testid="stRadio"] > div > label {
+    background-color: #4a5568 !important;
+    color: white !important;
+    padding: 20px 30px !important;
+    border-radius: 12px !important;
+    border: none !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    min-height: 70px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+div[data-testid="stRadio"] > div > label:hover {
+    background-color: #5a6578 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+}
+
+div[data-testid="stRadio"] > div > label > div {
+    color: white !important;
+}
+
+div[data-testid="stRadio"] > div > label > div > p,
+div[data-testid="stRadio"] > div > label > div > span,
+div[data-testid="stRadio"] > div > label span,
+div[data-testid="stRadio"] > div > label p {
+    color: white !important;
+}
+
+/* Selected radio button */
+div[data-testid="stRadio"] > div > label[data-selected="true"],
+div[data-testid="stRadio"] > div > label:has(input:checked) {
+    background-color: #2d3748 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+}
+
+/* Translate Button Styling */
+.stButton > button[kind="primary"],
+div.stButton > button[kind="primary"],
+button[kind="primary"],
+div.stButton button {
+    background: #4a5568 !important;
+    background-color: #4a5568 !important;
+    background-image: none !important;
+    color: white !important;
+    padding: 15px 40px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    border: none !important;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15) !important;
+}
+
+.stButton > button[kind="primary"]:hover,
+div.stButton > button[kind="primary"]:hover,
+button[kind="primary"]:hover,
+div.stButton button:hover {
+    background: #5a6578 !important;
+    background-color: #5a6578 !important;
+    background-image: none !important;
+    color: white !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
+    transform: translateY(-2px) !important;
+}
+
+.stButton > button[kind="primary"] *,
+.stButton > button[kind="primary"] p,
+.stButton > button[kind="primary"] span,
+div.stButton > button[kind="primary"] *,
+div.stButton > button[kind="primary"] p,
+div.stButton > button[kind="primary"] span {
+    color: white !important;
+}
+
+.stButton > button[kind="primary"]:hover *,
+.stButton > button[kind="primary"]:hover p,
+.stButton > button[kind="primary"]:hover span,
+div.stButton > button[kind="primary"]:hover *,
+div.stButton > button[kind="primary"]:hover p,
+div.stButton > button[kind="primary"]:hover span {
+    color: white !important;
+}
