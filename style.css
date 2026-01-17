@@ -38,11 +38,24 @@
     transform: scaleX(-1);
 }
 @media (max-width: 768px) {
-    .pattern-border {
-        width: 40px;
-    }
 
+    /* make the icons png smaller */
+    :root {
+        --pattern-width: 40px;
+    }
+    
+    /* Make header images smaller on mobile */
+    [data-testid="stImage"] img {
+        max-width: 100px !important;
+        height: auto !important;
+    }
+    .block-container {
+    max-width: calc(100% - var(--pattern-width) - 10px) !important;
+    margin: 0 auto !important;
 }
+}
+
+
 
 /* Add padding to main content to avoid overlap with pattern borders */
 [data-testid="stAppViewContainer"] > .main {
